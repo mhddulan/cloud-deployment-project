@@ -1,0 +1,55 @@
+services:
+
+  frontend:
+    image: nginx:latest
+    container_name: cloud-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend/index.html:/usr/share/nginx/html/index.html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: cloud-backend
+    environment:
+      DB_HOST: database
+      DB_NAME: cloud_db
+      DB_USER: cloud_user
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+  database:
+    image: postgres:16
+    container_name: cloud-database
+    environment:
+      POSTGRES_DB: cloud_db
+      POSTGRES_USER: cloud_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloud_user -d cloud_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cloud-network
+    restart: unless-stopped
+
+networks:
+  cloud-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
